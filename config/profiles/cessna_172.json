@@ -1,0 +1,16 @@
+{
+  "name": "Cessna 172M (1974)",
+  "variables": {
+    "altitude": { "start": 0, "stop": 11, "step": 0.5 },
+    "descent_rate": { "start": 0, "stop": 5.1, "step": 0.1 },
+    "airspeed": { "start": 20, "stop": 41, "step": 1 },
+    "crosswind": { "start": -8, "stop": 9, "step": 0.5 },
+    "rudder_as_input": { "start": -100, "stop": 101, "step": 1 },
+    "rudder_output": { "start": -100, "stop": 101, "step": 1 },
+    "elevator_output": { "start": -20, "stop": 101, "step": 1 }
+  },
+  "rule_files": {
+    "rudder": "config/rules/cessna_172_rudder.csv",
+    "elevator": "config/rules/cessna_172_elevator.csv"
+  }
+}
