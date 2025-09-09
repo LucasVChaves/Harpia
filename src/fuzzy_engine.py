@@ -2,14 +2,15 @@ import numpy as np
 import pandas as pd 
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
-from typing import Union
+from typing import Union, List
 
 class FuzzyController:
     def __init__(self, profile: dict):
+        if not profile: raise ValueError("Profile cannot be null")
         self.profile = profile
         self._variables = {}
         self._create_variables()
-        self._populate_pertinence_functions()
+        self._populate_membership_functions()
         self.rudder_sim = self._create_rudder_sim()
         self.elevator_sim = self._create_elevator_sim()
         print("Fuzzy Engine Inicialized")
@@ -17,13 +18,13 @@ class FuzzyController:
     def _create_variables(self):
         """Create antecedents / consquents objects based on the profile ranges"""
         for name, params in self.profile['variables'].items():
-            universo = np.arange(params['start'], params['stop'], params['step'])
-            if 'comando' in name:
-                self._variables[name] = ctrl.Consequent(universo, name)
+            universe = np.arange(params['start'], params['stop'], params['step'])
+            if 'output' in name:
+                self._variables[name] = ctrl.Consequent(universe, name)
             else:
-                self._variables[name] = ctrl.Antecedent(universo, name)
+                self._variables[name] = ctrl.Antecedent(universe, name)
 
-    def _populate_pertinence_functions(self):
+    def _populate_membership_functions(self):
         """Defines the fuzzy matrices for the each variable"""
         # Altitude (m)
         alt = self._variables['altitude']
@@ -66,6 +67,7 @@ class FuzzyController:
         eo['pull_light'] = fuzz.trimf(eo.universe, [20, 45, 70])
         eo['pull_strong'] = fuzz.trapmf(eo.universe, [60, 85, 100, 100])
 
+        # Rudder as Input (for the Elevator SIF)
         rai = self._variables['rudder_as_input']
         rai['total_left'] = fuzz.trapmf(rai.universe, [-100, -100, -80, -50])
         rai['partial_left'] = fuzz.trimf(rai.universe, [-70, -40, -10])
@@ -73,81 +75,73 @@ class FuzzyController:
         rai['partial_right'] = fuzz.trimf(rai.universe, [10, 40, 70])
         rai['total_right'] = fuzz.trapmf(rai.universe, [50, 80, 100, 100])
 
-    def _load_csv_rules(self, file_path: str) -> Union[dict, None]:
-        """Reads the CSV files with the fuzzy ruleset"""
+    def _load_csv_rules(self, file_path: str) -> List[ctrl.Rule]:
+        """Reads a CSV file and converts it into a list of scikit-fuzzy rules."""
         try:
-            regras_df = pd.read_csv(file_path, dtype=str).dropna(how='all')
-            regras_df = regras_df.fillna('')
+            df_rules = pd.read_csv(file_path, dtype=str).dropna(how='all').fillna('')
         except FileNotFoundError:
-            print(f"ERRO: Arquivo de regras não encontrado em '{file_path}'")
-            return None
-        regras_fuzzy = []
+            print(f"ERROR: Rules file not found at '{file_path}'")
+            return []
 
-        for index, row in regras_df.iterrows():
-            if not row['antecedents']:
-                continue
-                
-            clausulas_antecedentes = []
-            antecedents_str_list = row['antecedents'].split(';')
+        fuzzy_rules = []
+        for index, row in df_rules.iterrows():
+            if not row['antecedents']: continue
             
-            for item in antecedents_str_list:
+            antecedents = []
+            for item in row['antecedents'].split(';'):
                 if ':' not in item: continue
-                variavel, termo = item.split(':')
-                clausula = self._variables[variavel.strip()][termo.strip()]
-                clausulas_antecedentes.append(clausula)
-            
-            if not clausulas_antecedentes: continue
+                var, term = item.split(':')
+                antecedents.append(self._variables[var.strip()][term.strip()])
+            if not antecedents: continue
 
-            clausula_final = clausulas_antecedentes[0]
-            if len(clausulas_antecedentes) > 1:
-                operador = row['operator']
-                if operador == '&':
-                    for i in range(1, len(clausulas_antecedentes)):
-                        clausula_final &= clausulas_antecedentes[i]
-                elif operador == '|':
-                    for i in range(1, len(clausulas_antecedentes)):
-                        clausula_final |= clausulas_antecedentes[i]
+            if len(antecedents) > 1:
+                operator = row['operator']
+                if operator == '&':
+                    final_antecedent = np.bitwise_and.reduce(antecedents)
+                elif operator == '|':
+                    final_antecedent = np.bitwise_or.reduce(antecedents)
                 else:
-                    raise ValueError(f"Operador '{operador}' inválido na linha {index+2} do arquivo {file_path}")
+                    raise ValueError(f"Invalid operator '{operator}' at line {index+2} in '{file_path}'")
+            else:
+                final_antecedent = antecedents[0]
 
-            consequente = self._variables[row['consequent']][row['result']]
-            
-            regras_fuzzy.append(ctrl.Rule(clausula_final, consequente))
-                
-            print(f"Carregadas {len(regras_fuzzy)} regras de '{file_path}'")
-            return regras_fuzzy
-    
-    def _create_rudder_output(self):
+            consequent_clause = self._variables[row['consequent']][row['result']]
+            fuzzy_rules.append(ctrl.Rule(final_antecedent, consequent_clause))
+        
+        print(f"{len(fuzzy_rules)} rules were loaded from '{file_path}'")
+        return fuzzy_rules
+
+    def _create_rudder_sim(self):
         rules = self._load_csv_rules(self.profile['rule_files']['rudder'])
         ctrl_system = ctrl.ControlSystem(rules)
         return ctrl.ControlSystemSimulation(ctrl_system)
 
-    def _create_elevator_output(self):
+    def _create_elevator_sim(self):
         rules = self._load_csv_rules(self.profile['rule_files']['elevator'])
         self._variables['rudder_as_output'].automf(names=['total_left', 'partial_left', 'neutral', 'partial_right', 'total_right'])
         ctrl_system = ctrl.ControlSystem(rules)
         return ctrl.ControlSystemSimulation(ctrl_system)
-    
+
     def calculate_outputs(self, sensor_data: dict) -> Union[dict, None]:
+        """Calculates the control outputs in series (Rudder -> Elevator)."""
         try:
+            # --- Rudder Simulation ---
             self.rudder_sim.input['altitude'] = sensor_data['altitude']
             self.rudder_sim.input['crosswind'] = sensor_data['crosswind']
             self.rudder_sim.compute()
             rudder_output = self.rudder_sim.output['rudder_output']
 
-            self.elevator_sim.inputs.clear()
-
-            elevator_inputs = {ant.label for rule in self.elevator_sim.ctrl.rules for ant in rule.antecedent.terms}
-            if 'altitude' in elevator_inputs: self.elevator_sim.input['altitude'] = sensor_data['altitude']
-            if 'taxa_descida' in elevator_inputs: self.elevator_sim.input['taxa_descida'] = sensor_data['taxa_descida']
-            if 'velocidade' in elevator_inputs: self.elevator_sim.input['velocidade'] = sensor_data['velocidade']
-            if 'vento_traves' in elevator_inputs: self.elevator_sim.input['vento_traves'] = sensor_data['vento_traves']
-            if 'leme_como_entrada' in elevator_inputs: self.elevator_sim.input['leme_como_entrada'] = rudder_output
+            # --- Elevator Simulation ---
+            self.elevator_sim.input['altitude'] = sensor_data['altitude']
+            self.elevator_sim.input['descent_rate'] = sensor_data['descent_rate']
+            self.elevator_sim.input['airspeed'] = sensor_data['airspeed']
+            self.elevator_sim.input['crosswind'] = sensor_data.get('crosswind', 0)
+            self.elevator_sim.input['rudder_as_input'] = rudder_output
 
             self.elevator_sim.compute()
             elevator_output = self.elevator_sim.output['elevator_output']
 
             return {'rudder_output': rudder_output, 'elevator_output': elevator_output}
-        except Exception as e:
-            print(f"ERROR during fuzzy calculation: {e}")
+        except (ValueError, KeyError) as e:
+            print(f"WARNING: Could not calculate output for the current scenario. Error: {e}")
             return None

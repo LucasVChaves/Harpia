@@ -1,0 +1,8 @@
+antecedents,operator,consequent,result
+crosswind:strong_right;&,altitude:low,rudder_output,total_left
+crosswind:strong_right;&,altitude:ideal,rudder_output,partial_left
+crosswind:moderate_right,,rudder_output,partial_left
+crosswind:null,,rudder_output,neutral
+crosswind:moderate_left,,rudder_output,partial_right
+crosswind:strong_left;&,altitude:ideal,rudder_output,partial_right
+crosswind:strong_left;&,altitude:low,rudder_output,total_right

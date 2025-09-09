@@ -6,7 +6,7 @@ from pathlib import Path
 
 def select_airplane_profile() -> str | None:
     """Searches for airplanes profiles in the config folder"""
-    profiles_path = Path("config/profiles")
+    profiles_path = Path("src/config/profiles")
     if not profiles_path.exists() or not profiles_path.is_dir():
         print(f"ERROR: Directory '{profiles_path}' not found")
         return None
@@ -36,31 +36,34 @@ def select_airplane_profile() -> str | None:
 
 
 def main():
-    print("Inicializing the flare assist program")
+    print("Initializing the Flare Assist program...")
 
-    profile = select_airplane_profile()
-    if not profile:
-        print("Killing program")
+    profile_name = select_airplane_profile()
+    if not profile_name:
+        print("No profile selected. Killing program.")
         return
     
-    profile = airplane_profiles.load_profile(profile)
-    if not profile:
-        print("Could not find the profile. Killing program")
+    loaded_profile = airplane_profiles.load_profile(profile_name)
+    if not loaded_profile:
+        print("Could not load the profile. Killing program.")
         return
     
-    fuzzy_controller = fuzzy_engine.FuzzyController(airplane_profiles)
+    fuzzy_controller = fuzzy_engine.FuzzyController(loaded_profile)
     simulator = simulator_interface.DummySimulator()
 
-    print(f"Inicializing real time control loop (simulated)... Press Ctrl+c to exit.")
+    print(f"\nInitializing real-time control loop (simulated)... Press Ctrl+C to exit.")
     try:
         while True:
-            curr_data = simulator.read_rand_data()
-            print(f"Reading data: Altitude={curr_data['altitude']:.1f}m, crosswind={curr_data['vento_traves']:.1f}m/s")
+            current_data = simulator.read_rand_data()
+            print(f"\nReading data: Altitude={current_data['altitude']:.1f}m, Crosswind={current_data['crosswind']:.1f}m/s")
 
-            output = fuzzy_controller.calculate_outputs(curr_data)
-            if output:
-                simulator.send_command(output)
+            commands = fuzzy_controller.calculate_outputs(current_data)
+            if commands:
+                simulator.send_command(commands)
 
-            time.sleep(0.2) # 5 Hz
+            time.sleep(0.2) # 5 Hz loop frequency
     except KeyboardInterrupt:
-        print("\n Loop interrupt stopped by the user. Killing program.")
+        print("\nControl loop stopped by the user. Killing program.")
+
+if __name__ == "__main__":
+    main()

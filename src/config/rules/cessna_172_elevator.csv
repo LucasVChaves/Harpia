@@ -1,0 +1,9 @@
+antecedents,operator,consequent,result
+descent_rate:high,|,altitude:low,elevator_output,pull_strong
+descent_rate:ideal;&,altitude:ideal,elevator_output,pull_light
+descent_rate:low;&,altitude:low,elevator_output,maintain
+airspeed:low;&,descent_rate:high,elevator_output,pull_light
+airspeed:high,,elevator_output,pull_strong
+airspeed:ideal;&,descent_rate:ideal;&,altitude:ideal,elevator_output,maintain
+rudder_as_input:total_left,|,rudder_as_input:total_right,elevator_output,pull_light
+crosswind:strong_left,|,crosswind:strong_right,elevator_output,pull_light
