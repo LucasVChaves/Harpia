@@ -1,8 +1,8 @@
 antecedents,operator,consequent,result
-crosswind:strong_right;&,altitude:low,rudder_output,total_left
-crosswind:strong_right;&,altitude:ideal,rudder_output,partial_left
-crosswind:moderate_right,,rudder_output,partial_left
-crosswind:null,,rudder_output,neutral
-crosswind:moderate_left,,rudder_output,partial_right
-crosswind:strong_left;&,altitude:ideal,rudder_output,partial_right
-crosswind:strong_left;&,altitude:low,rudder_output,total_right
+vento_traves==forte_direita,AND,comando_leme,esquerda_total
+vento_traves==moderado_direita,AND,comando_leme,esquerda_parcial
+vento_traves==nulo,AND,comando_leme,neutro
+vento_traves==moderado_esquerda,AND,comando_leme,direita_parcial
+vento_traves==forte_esquerda,AND,comando_leme,direita_total
+vento_traves==forte_direita|altitude==muito_baixa,AND,comando_leme,esquerda_total
+vento_traves==forte_esquerda|altitude==muito_baixa,AND,comando_leme,direita_total

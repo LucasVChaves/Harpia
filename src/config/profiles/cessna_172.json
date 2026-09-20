@@ -1,16 +1,313 @@
 {
-  "name": "Cessna 172M (1974)",
-  "variables": {
-    "altitude": { "start": 0, "stop": 11, "step": 0.5 },
-    "descent_rate": { "start": 0, "stop": 5.1, "step": 0.1 },
-    "airspeed": { "start": 20, "stop": 41, "step": 1 },
-    "crosswind": { "start": -8, "stop": 9, "step": 0.5 },
-    "rudder_as_input": { "start": -100, "stop": 101, "step": 1 },
-    "rudder_output": { "start": -100, "stop": 101, "step": 1 },
-    "elevator_output": { "start": -20, "stop": 101, "step": 1 }
+  "velocidade": {
+    "universe": [
+      20,
+      41
+    ],
+    "step": 1,
+    "type": "antecedent",
+    "terms": {
+      "lenta": {
+        "shape": "trapmf",
+        "params": [
+          20,
+          20,
+          24,
+          29
+        ]
+      },
+      "ideal": {
+        "shape": "trapmf",
+        "params": [
+          27,
+          29,
+          33.5,
+          35.5
+        ]
+      },
+      "rapida": {
+        "shape": "trapmf",
+        "params": [
+          33.5,
+          36,
+          40,
+          40
+        ]
+      }
+    }
   },
-  "rule_files": {
-    "rudder": "config/rules/cessna_172_rudder.csv",
-    "elevator": "config/rules/cessna_172_elevator.csv"
+  "vento_traves": {
+    "universe": [
+      -8,
+      9
+    ],
+    "step": 1,
+    "type": "antecedent",
+    "terms": {
+      "forte_esquerda": {
+        "shape": "trapmf",
+        "params": [
+          -8,
+          -8,
+          -7,
+          -4
+        ]
+      },
+      "moderado_esquerda": {
+        "shape": "trimf",
+        "params": [
+          -6,
+          -3.5,
+          -1
+        ]
+      },
+      "nulo": {
+        "shape": "trimf",
+        "params": [
+          -2,
+          0,
+          2
+        ]
+      },
+      "moderado_direita": {
+        "shape": "trimf",
+        "params": [
+          1,
+          3.5,
+          6
+        ]
+      },
+      "forte_direita": {
+        "shape": "trapmf",
+        "params": [
+          4,
+          7,
+          8,
+          8
+        ]
+      }
+    }
+  },
+  "altitude": {
+    "universe": [
+      0,
+      11
+    ],
+    "step": 0.5,
+    "type": "antecedent",
+    "terms": {
+      "muito_baixa": {
+        "shape": "trapmf",
+        "params": [
+          0,
+          0,
+          1,
+          3
+        ]
+      },
+      "ideal_para_flare": {
+        "shape": "trapmf",
+        "params": [
+          2,
+          4,
+          6,
+          8
+        ]
+      },
+      "alta": {
+        "shape": "trapmf",
+        "params": [
+          7,
+          9,
+          10,
+          10
+        ]
+      }
+    }
+  },
+  "taxa_descida": {
+    "universe": [
+      0,
+      5.1
+    ],
+    "step": 0.1,
+    "type": "antecedent",
+    "terms": {
+      "baixa": {
+        "shape": "trapmf",
+        "params": [
+          0,
+          0,
+          1,
+          2
+        ]
+      },
+      "adequada": {
+        "shape": "trapmf",
+        "params": [
+          1.5,
+          2.5,
+          3,
+          4
+        ]
+      },
+      "elevada": {
+        "shape": "trapmf",
+        "params": [
+          3.5,
+          4.5,
+          5,
+          5
+        ]
+      }
+    }
+  },
+  "leme_como_entrada": {
+    "universe": [
+      -100,
+      101
+    ],
+    "step": 1,
+    "type": "antecedent",
+    "terms": {
+      "esquerda_total": {
+        "shape": "trapmf",
+        "params": [
+          -100,
+          -100,
+          -80,
+          -50
+        ]
+      },
+      "esquerda_parcial": {
+        "shape": "trimf",
+        "params": [
+          -70,
+          -40,
+          -10
+        ]
+      },
+      "neutro": {
+        "shape": "trimf",
+        "params": [
+          -20,
+          0,
+          20
+        ]
+      },
+      "direita_parcial": {
+        "shape": "trimf",
+        "params": [
+          10,
+          40,
+          70
+        ]
+      },
+      "direita_total": {
+        "shape": "trapmf",
+        "params": [
+          50,
+          80,
+          100,
+          100
+        ]
+      }
+    }
+  },
+  "comando_leme": {
+    "universe": [
+      -100,
+      101
+    ],
+    "step": 1,
+    "type": "consequent",
+    "terms": {
+      "esquerda_total": {
+        "shape": "trapmf",
+        "params": [
+          -100,
+          -100,
+          -80,
+          -50
+        ]
+      },
+      "esquerda_parcial": {
+        "shape": "trimf",
+        "params": [
+          -70,
+          -40,
+          -10
+        ]
+      },
+      "neutro": {
+        "shape": "trimf",
+        "params": [
+          -20,
+          0,
+          20
+        ]
+      },
+      "direita_parcial": {
+        "shape": "trimf",
+        "params": [
+          10,
+          40,
+          70
+        ]
+      },
+      "direita_total": {
+        "shape": "trapmf",
+        "params": [
+          50,
+          80,
+          100,
+          100
+        ]
+      }
+    }
+  },
+  "comando_profundor": {
+    "universe": [
+      -20,
+      101
+    ],
+    "step": 1,
+    "type": "consequent",
+    "terms": {
+      "empurrar": {
+        "shape": "trapmf",
+        "params": [
+          -20,
+          -20,
+          -10,
+          0
+        ]
+      },
+      "manter": {
+        "shape": "trimf",
+        "params": [
+          -5,
+          10,
+          25
+        ]
+      },
+      "puxar_suave": {
+        "shape": "trimf",
+        "params": [
+          20,
+          45,
+          70
+        ]
+      },
+      "puxar_forte": {
+        "shape": "trapmf",
+        "params": [
+          60,
+          85,
+          100,
+          100
+        ]
+      }
+    }
   }
 }

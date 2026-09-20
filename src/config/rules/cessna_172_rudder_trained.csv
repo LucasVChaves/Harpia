@@ -1,0 +1,6 @@
+antecedents,operator,consequent,result
+altitude==ideal_para_flare|taxa_descida==adequada|velocidade==ideal|vento_traves==moderado_esquerda,AND,comando_leme,direita_parcial
+altitude==muito_baixa|taxa_descida==baixa|velocidade==ideal|vento_traves==moderado_direita,AND,comando_leme,esquerda_parcial
+altitude==ideal_para_flare|taxa_descida==adequada|velocidade==ideal|vento_traves==moderado_esquerda,AND,comando_leme,direita_parcial
+altitude==alta|taxa_descida==adequada|velocidade==ideal|vento_traves==forte_direita,AND,comando_leme,esquerda_total
+altitude==ideal_para_flare|taxa_descida==adequada|velocidade==rapida|vento_traves==moderado_direita,AND,comando_leme,esquerda_parcial

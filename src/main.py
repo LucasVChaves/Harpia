@@ -1,69 +1,114 @@
-import time
-import airplane_profiles
-import fuzzy_engine
-import simulator_interface
-from pathlib import Path
+import json
+import logging
+import os
+import sys
+import random
+from fuzzy_engine import HarpiaFuzzyEngine
 
-def select_airplane_profile() -> str | None:
-    """Searches for airplanes profiles in the config folder"""
-    profiles_path = Path("src/config/profiles")
-    if not profiles_path.exists() or not profiles_path.is_dir():
-        print(f"ERROR: Directory '{profiles_path}' not found")
-        return None
-    
-    available_profiles = sorted([p.stem for p in profiles_path.glob("*.json")])
-    if not available_profiles:
-        print(f"ERRO: No available profiles (.json) found in '{profiles_path}'")
-        return None
-    
-    print("\nPlease choose an aircraft profile:")
-    for i, profile_name in enumerate(available_profiles):
-        print(f"  [{i + 1}] - {profile_name}")
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
+def load_json(filepath: str) -> dict:
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logger.error(f"Erro: O arquivo de perfil não foi encontrado em {filepath}")
+        sys.exit(1)
+
+def select_profile(profiles_dir: str) -> str:
+    if not os.path.exists(profiles_dir):
+        logger.error(f"Diretório de perfis não encontrado: {profiles_dir}")
+        sys.exit(1)
+        
+    profiles = [f for f in os.listdir(profiles_dir) if f.endswith('.json')]
+    
+    if not profiles:
+        logger.error("Nenhum perfil de aeronave (.json) encontrado.")
+        sys.exit(1)
+        
+    print("\n=== PERFIS DE AERONAVE DISPONÍVEIS ===")
+    for idx, profile in enumerate(profiles):
+        print(f"[{idx}] {profile.replace('.json', '')}")
+        
     while True:
         try:
-            selection = input(f"Insert the chosen profile number (1-{len(available_profiles)}):")
-            selection = int(selection)
-            if 1 <= selection <= len(available_profiles):
-                return available_profiles[selection - 1]
-            else:
-                print("Invalid selection. Choose one of the enumerated numbers.")
+            choice = int(input("\nSelecione o ID do perfil desejado: "))
+            if 0 <= choice < len(profiles):
+                return profiles[choice]
+            print("ID inválido. Tente novamente.")
         except ValueError:
-            print("Invalid input. Choose one of the enumerated numbers.")
-        except KeyboardInterrupt:
-            print("\n Selection interrupted by the user")
-            return None
+            print("Por favor, insira um número válido.")
 
+def get_flight_data() -> dict:
+    print("\n=== DADOS DE TELEMETRIA (FLARE) ===")
+    print("[1] Inserir dados manualmente")
+    print("[2] Gerar cenário aleatório realista")
+    
+    escolha = input("Opção: ").strip()
+    
+    if escolha == '1':
+        try:
+            alt = float(input(" Altitude (0 a 10m): "))
+            td = float(input(" Taxa de descida (0.5 a 5m/s): "))
+            vel = float(input(" Velocidade (20 a 40m/s): "))
+            vento = float(input(" Vento de través (-8 a 8m/s): "))
+            return {'altitude': alt, 'taxa_descida': td, 'velocidade': vel, 'vento_traves': vento}
+        except ValueError:
+            logger.warning("Entrada inválida detectada. Alternando para geração aleatória.")
+            
+    data = {
+        'altitude': round(random.uniform(1.0, 8.0), 1),
+        'taxa_descida': round(random.uniform(1.0, 3.5), 1),
+        'velocidade': round(random.uniform(25.0, 36.0), 1),
+        'vento_traves': round(random.uniform(-7.0, 7.0), 1)
+    }
+    logger.info(f"Cenário sintético gerado: {data}")
+    return data
 
 def main():
-    print("Initializing the Flare Assist program...")
-
-    profile_name = select_airplane_profile()
-    if not profile_name:
-        print("No profile selected. Killing program.")
-        return
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    profiles_dir = os.path.join(base_dir, 'config', 'profiles')
+    rules_dir = os.path.join(base_dir, 'config', 'rules')
     
-    loaded_profile = airplane_profiles.load_profile(profile_name)
-    if not loaded_profile:
-        print("Could not load the profile. Killing program.")
-        return
+    selected_filename = select_profile(profiles_dir)
+    aircraft_name = selected_filename.replace('.json', '')
     
-    fuzzy_controller = fuzzy_engine.FuzzyController(loaded_profile)
-    simulator = simulator_interface.DummySimulator()
-
-    print(f"\nInitializing real-time control loop (simulated)... Press Ctrl+C to exit.")
+    profile_path = os.path.join(profiles_dir, selected_filename)
+    rudder_rules_path = os.path.join(rules_dir, f'{aircraft_name}_rudder.csv')
+    elevator_rules_path = os.path.join(rules_dir, f'{aircraft_name}_elevator.csv')
+    
+    logger.info(f"Iniciando Harpia Engine com o perfil: {aircraft_name.upper()}")
+    profile_data = load_json(profile_path)
+    
     try:
-        while True:
-            current_data = simulator.read_rand_data()
-            print(f"\nReading data: Altitude={current_data['altitude']:.1f}m, Crosswind={current_data['crosswind']:.1f}m/s")
-
-            commands = fuzzy_controller.calculate_outputs(current_data)
-            if commands:
-                simulator.send_command(commands)
-
-            time.sleep(0.2) # 5 Hz loop frequency
-    except KeyboardInterrupt:
-        print("\nControl loop stopped by the user. Killing program.")
+        engine = HarpiaFuzzyEngine(
+            profile_data=profile_data,
+            rudder_csv=rudder_rules_path,
+            elevator_csv=elevator_rules_path
+        )
+    except Exception as e:
+        logger.error(f"Falha na compilação do motor. Verifique a sintaxe dos CSVs: {e}")
+        sys.exit(1)
+    
+    flight_data = get_flight_data()
+    
+    try:
+        rudder, elevator = engine.compute(**flight_data)
+        
+        print("\n" + "=" * 50)
+        print(" SIMULAÇÃO DE POUSO - RESULTADO DA INFERÊNCIA")
+        print("=" * 50)
+        print(f" Leme:      {rudder:>6.2f}% ({'Esquerda' if rudder < 0 else 'Direita'})")
+        print(f" Profundor: {elevator:>6.2f}% ({'Empurrar' if elevator < 0 else 'Puxar'})")
+        print("=" * 50 + "\n")
+        
+    except ValueError:
+        logger.error("Falha na inferência. O cenário recaiu em um hiato não mapeado pelas regras base.")
 
 if __name__ == "__main__":
     main()

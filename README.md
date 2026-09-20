@@ -19,21 +19,21 @@ O projeto foi desenvolvido com uma arquitetura idealizada para diferentes modelo
 A estrutura do projeto é organizada da seguinte forma:
 
 ```plaintext
-Harpia/
-├── venv/                  # Ambiente virtual do Python
-├── src/
-│   ├── main.py            # Ponto de entrada principal do programa
-│   ├── fuzzy_engine.py    # Classe principal do motor de inferência fuzzy
-│   ├── airplane_profiles.py # Módulo para carregar perfis de aeronaves
-│   ├── simulator_interface.py # Interface para comunicação com simuladores
-│   └── config/
-│       ├── profiles/
-│       │   └── cessna_172.json
-│       └── rules/
-│           ├── cessna_172_rudder.csv
-│           └── cessna_172_elevator.csv
-├── requirements.txt       # Lista de dependências do projeto
-└── README.md              # Este arquivo
+Harpia-dev/
+├── requirements.txt
+└── src/
+    ├── main.py                   # Entrypoint interativo (Runtime)
+    ├── fuzzy_engine.py           # Motor de inferência Skfuzzy
+    ├── rule_trainer.py           # Pipeline de aprendizado Neurofuzzy (K-Means)
+    ├── simulator_interface.py    # Daemon de comunicação (futura integração)
+    └── config/
+        ├── profiles/             # Envelopes de voo
+        │   ├── cessna_172.json
+        │   └── aircraft_template.json
+        └── rules/                # Base de conhecimento e regras treinadas
+            ├── cessna_172_rudder.csv
+            ├── cessna_172_elevator.csv
+            └── rule_template.csv
 ```
 
 ## 3. Tutorial de Instalação e Execução
@@ -75,7 +75,15 @@ pip install -r requirements.txt
 ```
 
 Como Rodar o Programa
-Com o ambiente virtual ativado e as dependências instaladas, execute o programa a partir do diretório raiz do projeto (`Harpia/`):
+Com o ambiente virtual ativado e as dependências instaladas, execute os módulos do programa a partir do diretório raiz do projeto (`Harpia/`):
+
+Primeiro, treine o motor fuzzy (opcional, caso queira gerar novas regras):
+
+```Bash
+python -m src.rule_trainer
+```
+
+Depois, execute o programa principal:
 
 ```Bash
 python -m src.main
@@ -89,8 +97,9 @@ Ao executar o programa, você verá um menu interativo:
 
 1. Seleção de Perfil: Uma lista de todas as aeronaves disponíveis (definidas nos arquivos .json em src/config/profiles/) será exibida.
 2. Digite o Número: Insira o número correspondente ao perfil que deseja carregar.
-3. Simulação em Loop: O programa iniciará o loop de controle, utilizando o DummySimulator para gerar dados de voo aleatórios. A cada ciclo, ele imprimirá no terminal os dados lidos dos "sensores" e os comandos calculados pelo motor fuzzy.
-4. Encerrar: Pressione Ctrl+C para parar a simulação e encerrar o programa.
+3. Carregamento de Dados de Voo: O usuário pode optar por inserir dados de voo manualmente ou gerar dados aleatórios.
+4. Simulação em Loop: O programa iniciará o loop de controle, utilizando o DummySimulator para gerar dados de voo aleatórios. A cada ciclo, ele imprimirá no terminal os dados lidos dos "sensores" e os comandos calculados pelo motor fuzzy.
+5. Encerrar: Pressione Ctrl+C para parar a simulação e encerrar o programa.
 
 ## 5. Roadmap Futuro
 

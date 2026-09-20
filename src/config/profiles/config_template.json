@@ -1,0 +1,47 @@
+{
+    "nome_da_variavel_1": {
+        "universe": [
+            0.0,
+            100.0
+        ],
+        "step": 0.5,
+        "type": "antecedent",
+        "terms": {
+            "termo_linguistico_1": {
+                "shape": "trimf",
+                "params": [
+                    0.0,
+                    25.0,
+                    50.0
+                ]
+            },
+            "termo_linguistico_2": {
+                "shape": "trapmf",
+                "params": [
+                    25.0,
+                    50.0,
+                    75.0,
+                    100.0
+                ]
+            }
+        }
+    },
+    "nome_da_variavel_2": {
+        "universe": [
+            -50,
+            50
+        ],
+        "step": 1,
+        "type": "consequent",
+        "terms": {
+            "termo_linguistico_unico": {
+                "shape": "trimf",
+                "params": [
+                    -50,
+                    0,
+                    50
+                ]
+            }
+        }
+    }
+}

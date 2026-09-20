@@ -1,0 +1,8 @@
+antecedents,operator,consequent,result
+altitude==muito_baixa|taxa_descida==adequada|velocidade==ideal|vento_traves==moderado_esquerda,AND,comando_profundor,puxar_suave
+altitude==alta|taxa_descida==adequada|velocidade==rapida|vento_traves==moderado_direita,AND,comando_profundor,puxar_forte
+altitude==ideal_para_flare|taxa_descida==adequada|velocidade==ideal|vento_traves==forte_direita,AND,comando_profundor,puxar_suave
+altitude==ideal_para_flare|taxa_descida==baixa|velocidade==rapida|vento_traves==moderado_esquerda,AND,comando_profundor,puxar_forte
+altitude==ideal_para_flare|taxa_descida==elevada|velocidade==ideal|vento_traves==moderado_esquerda,AND,comando_profundor,puxar_suave
+altitude==ideal_para_flare|taxa_descida==baixa|velocidade==rapida|vento_traves==moderado_direita,AND,comando_profundor,puxar_suave
+altitude==muito_baixa|taxa_descida==elevada|velocidade==ideal|vento_traves==nulo,AND,comando_profundor,puxar_forte
