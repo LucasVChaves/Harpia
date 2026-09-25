@@ -69,11 +69,16 @@ class NeuroFuzzyTrainer:
         wcss_norm = MinMaxScaler().fit_transform(np.array(wcss).reshape(-1, 1))
         pontos = np.column_stack((k_norm, wcss_norm))
         
-        linha = np.array([pontos[0], pontos[-1]])
-        vetor_linha = linha[1] - linha[0]
-        norm_linha = np.linalg.norm(vetor_linha)
+        p1 = pontos[0]
+        p2 = pontos[-1]
+        norm_linha = np.linalg.norm(p2 - p1)
         
-        distancias = [np.linalg.norm(np.cross(vetor_linha, linha[0] - p)) / norm_linha for p in pontos]
+        # Cálculo compatível com NumPy 2.0+ (Distância ponto-reta em 2D sem np.cross)
+        # d = |(x2 - x1)*(y1 - y0) - (x1 - x0)*(y2 - y1)| / ||P2 - P1||
+        distancias = [
+            np.abs((p2[0] - p1[0]) * (p1[1] - p[1]) - (p1[0] - p[0]) * (p2[1] - p1[1])) / norm_linha 
+            for p in pontos
+        ]
         
         k_opt = cluster_range[np.argmax(distancias)]
         logger.info(f"Matemática de convergência concluída. K ótimo estabilizado em: {k_opt} regras.")
