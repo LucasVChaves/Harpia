@@ -77,17 +77,30 @@ class HarpiaFuzzyEngine:
         logger.info("Motor de inferência Harpia instanciado e pronto para execução.")
 
     def compute(self, altitude: float, taxa_descida: float, velocidade: float, vento_traves: float) -> tuple[float, float]:
-        self.sim_rudder.input['altitude'] = altitude
-        self.sim_rudder.input['vento_traves'] = vento_traves
+        telemetry = {
+            'altitude': altitude,
+            'taxa_descida': taxa_descida,
+            'velocidade': velocidade,
+            'vento_traves': vento_traves
+        }
+        
+        for key, value in telemetry.items():
+            try:
+                self.sim_rudder.input[key] = value
+            except ValueError:
+                pass
+                
         self.sim_rudder.compute()
         rudder_output = self.sim_rudder.output['comando_leme']
         
-        self.sim_elevator.input['altitude'] = altitude
-        self.sim_elevator.input['taxa_descida'] = taxa_descida
-        self.sim_elevator.input['velocidade'] = velocidade
-        self.sim_elevator.input['vento_traves'] = vento_traves
-        self.sim_elevator.input['leme_como_entrada'] = rudder_output
+        telemetry['leme_como_entrada'] = rudder_output
         
+        for key, value in telemetry.items():
+            try:
+                self.sim_elevator.input[key] = value
+            except ValueError:
+                pass
+                
         self.sim_elevator.compute()
         elevator_output = self.sim_elevator.output['comando_profundor']
         

@@ -18,8 +18,8 @@ class NeuroFuzzyTrainer:
         self.engine = base_engine
         self.max_clusters = max_clusters
 
-    def generate_synthetic_data(self, num_scenarios: int = 100) -> pd.DataFrame:
-        logger.info(f"Gerando {num_scenarios} cenários sintéticos de aproximação...")
+    def generate_synthetic_data(self, num_scenarios: int = 2000) -> pd.DataFrame:
+        logger.info(f"Gerando {num_scenarios} cenários sintéticos para amostragem densa...")
         
         dados_entrada = {
             'altitude': np.random.uniform(0, 10, num_scenarios),
@@ -50,13 +50,10 @@ class NeuroFuzzyTrainer:
         df_final = df.loc[indices_validos].copy()
         df_final['comando_leme'] = resultados_leme
         df_final['comando_profundor'] = resultados_profundor
-        
-        logger.info(f"Simulação base concluída. {len(df_final)} cenários viáveis retidos para aprendizado.")
         return df_final
 
     def _find_optimal_k(self, X_scaled: np.ndarray) -> int:
-        logger.info(f"Avaliando o K ótimo (limite de {self.max_clusters} clusters) via método do cotovelo ortogonal...")
-        
+        logger.info(f"Avaliando K ótimo (limite {self.max_clusters}) via cotovelo ortogonal...")
         wcss = []
         cluster_range = range(1, self.max_clusters + 1)
         
@@ -73,15 +70,20 @@ class NeuroFuzzyTrainer:
         p2 = pontos[-1]
         norm_linha = np.linalg.norm(p2 - p1)
         
-        # Cálculo compatível com NumPy 2.0+ (Distância ponto-reta em 2D sem np.cross)
-        # d = |(x2 - x1)*(y1 - y0) - (x1 - x0)*(y2 - y1)| / ||P2 - P1||
         distancias = [
             np.abs((p2[0] - p1[0]) * (p1[1] - p[1]) - (p1[0] - p[0]) * (p2[1] - p1[1])) / norm_linha 
             for p in pontos
         ]
         
         k_opt = cluster_range[np.argmax(distancias)]
-        logger.info(f"Matemática de convergência concluída. K ótimo estabilizado em: {k_opt} regras.")
+        
+        try:
+            from plotter import plot_metodo_cotovelo
+            plot_metodo_cotovelo(list(cluster_range), wcss, k_opt, "fig_grafico_cotovelo.png")
+        except ImportError:
+            pass
+            
+        logger.info(f"Convergência concluída. K ótimo: {k_opt} regras.")
         return k_opt
 
     def _translate_to_fuzzy(self, variable_name: str, value: float) -> str:
@@ -92,51 +94,66 @@ class NeuroFuzzyTrainer:
         }
         return max(memberships, key=memberships.get)
 
-    def train_and_export(self, output_csv_path: str, target: str = 'comando_leme'):
-        logger.info(f"Iniciando pipeline de treinamento Neurofuzzy para o controlador: {target.upper()}")
+    def train_and_export(self, output_csv_path: str, target: str, base_csv_path: str):
+        logger.info(f"Iniciando pipeline Neurofuzzy para: {target.upper()}")
         
-        df = self.generate_synthetic_data(num_scenarios=200)
+        df = self.generate_synthetic_data(num_scenarios=2000)
         
-        features = ['altitude', 'taxa_descida', 'velocidade', 'vento_traves']
+        if target == 'comando_leme':
+            features = ['altitude', 'vento_traves']
+        else:
+            features = ['altitude', 'taxa_descida', 'velocidade']
+            
         X = df[features]
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
         k_opt = self._find_optimal_k(X_scaled)
         
-        logger.info("Extraindo matriz de centroides K-Means...")
         kmeans = KMeans(n_clusters=k_opt, random_state=42, n_init=10)
         kmeans.fit(X_scaled)
         centers = scaler.inverse_transform(kmeans.cluster_centers_)
         
-        csv_headers = ['antecedents', 'operator', 'consequent', 'result']
         extracted_rules = []
+        
+        logger.info("Hibridização: Integrando regras heurísticas base (Safety Net)...")
+        with open(base_csv_path, mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row and row.get('antecedents') and row['antecedents'].strip():
+                    extracted_rules.append(row)
 
-        logger.info("Traduzindo tensores numéricos para variáveis linguísticas fuzzy...")
+        logger.info("Adicionando regras Neurofuzzy otimizadas...")
         for i, center in enumerate(centers):
-            alt_term = self._translate_to_fuzzy('altitude', center[0])
-            td_term = self._translate_to_fuzzy('taxa_descida', center[1])
-            vel_term = self._translate_to_fuzzy('velocidade', center[2])
-            vento_term = self._translate_to_fuzzy('vento_traves', center[3])
+            if target == 'comando_leme':
+                alt_term = self._translate_to_fuzzy('altitude', center[0])
+                vento_term = self._translate_to_fuzzy('vento_traves', center[1])
+                antecedents_str = f"altitude=={alt_term}|vento_traves=={vento_term}"
+            else:
+                alt_term = self._translate_to_fuzzy('altitude', center[0])
+                td_term = self._translate_to_fuzzy('taxa_descida', center[1])
+                vel_term = self._translate_to_fuzzy('velocidade', center[2])
+                antecedents_str = f"altitude=={alt_term}|taxa_descida=={td_term}|velocidade=={vel_term}"
             
             mean_output = df[kmeans.labels_ == i][target].mean()
             out_term = self._translate_to_fuzzy(target, mean_output)
             
-            antecedents_str = f"altitude=={alt_term}|taxa_descida=={td_term}|velocidade=={vel_term}|vento_traves=={vento_term}"
-            
-            extracted_rules.append({
+            rule_dict = {
                 'antecedents': antecedents_str,
                 'operator': 'AND',
                 'consequent': target,
                 'result': out_term
-            })
+            }
+            if rule_dict not in extracted_rules:
+                extracted_rules.append(rule_dict)
 
+        csv_headers = ['antecedents', 'operator', 'consequent', 'result']
         with open(output_csv_path, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.DictWriter(file, fieldnames=csv_headers)
             writer.writeheader()
             writer.writerows(extracted_rules)
             
-        logger.info(f"Sucesso! {len(extracted_rules)} regras persistidas fisicamente em: {output_csv_path}")
+        logger.info(f"Sucesso! {len(extracted_rules)} regras persistidas em: {output_csv_path}")
 
 if __name__ == "__main__":
     import os
@@ -149,17 +166,12 @@ if __name__ == "__main__":
         logger.error("Falha na importação. Certifique-se de que fuzzy_engine.py está no mesmo diretório.")
         sys.exit(1)
 
-    def load_json(filepath: str) -> dict:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
-
     base_dir = os.path.dirname(os.path.abspath(__file__))
     profiles_dir = os.path.join(base_dir, 'config', 'profiles')
     rules_dir = os.path.join(base_dir, 'config', 'rules')
     
     profiles = [f for f in os.listdir(profiles_dir) if f.endswith('.json')]
     if not profiles:
-        logger.error("Nenhum perfil de aeronave encontrado no diretório de configurações.")
         sys.exit(1)
         
     print("\n=== TREINAMENTO NEUROFUZZY - SELEÇÃO DE PERFIL ===")
@@ -177,28 +189,23 @@ if __name__ == "__main__":
     output_rudder_csv = os.path.join(rules_dir, f'{aircraft_name}_rudder_trained.csv')
     output_elevator_csv = os.path.join(rules_dir, f'{aircraft_name}_elevator_trained.csv')
 
-    logger.info(f"Compilando motor de geração sintética para: {aircraft_name.upper()}")
-    try:
-        profile_data = load_json(profile_path)
-        base_engine = HarpiaFuzzyEngine(
-            profile_data=profile_data,
-            rudder_csv=base_rudder_csv,
-            elevator_csv=base_elevator_csv
-        )
-    except Exception as e:
-        logger.error(f"Erro fatal na compilação do motor. Falta de regras base? Detalhes: {e}")
-        sys.exit(1)
+    with open(profile_path, 'r', encoding='utf-8') as f:
+        profile_data = json.load(f)
+        
+    base_engine = HarpiaFuzzyEngine(
+        profile_data=profile_data,
+        rudder_csv=base_rudder_csv,
+        elevator_csv=base_elevator_csv
+    )
 
     trainer = NeuroFuzzyTrainer(base_engine=base_engine, max_clusters=15)
 
-    logger.info("=== INICIANDO PIPELINE DE APRENDIZADO DE MÁQUINA ===")
-    try:
-        logger.info(f"--- Otimizando SIF A: Leme ---")
-        trainer.train_and_export(output_csv_path=output_rudder_csv, target='comando_leme')
-        
-        logger.info(f"--- Otimizando SIF B: Profundor ---")
-        trainer.train_and_export(output_csv_path=output_elevator_csv, target='comando_profundor')
-        
-        logger.info("=== TREINAMENTO CONCLUÍDO COM SUCESSO ===")
-    except Exception as e:
-        logger.error(f"Processo de treinamento abortado: {e}", exc_info=True)
+    logger.info("=== INICIANDO PIPELINE HÍBRIDO ===")
+    
+    logger.info(f"--- Otimizando SIF A: Leme ---")
+    trainer.train_and_export(output_csv_path=output_rudder_csv, target='comando_leme', base_csv_path=base_rudder_csv)
+    
+    logger.info(f"--- Otimizando SIF B: Profundor ---")
+    trainer.train_and_export(output_csv_path=output_elevator_csv, target='comando_profundor', base_csv_path=base_elevator_csv)
+    
+    logger.info("=== TREINAMENTO CONCLUÍDO COM SUCESSO ===")
