@@ -84,15 +84,22 @@ class HarpiaFuzzyEngine:
             'vento_traves': vento_traves
         }
         
+        # LEME 
         for key, value in telemetry.items():
             try:
                 self.sim_rudder.input[key] = value
             except ValueError:
                 pass
                 
-        self.sim_rudder.compute()
-        rudder_output = self.sim_rudder.output['comando_leme']
-        
+        try:
+            self.sim_rudder.compute()
+            rudder_output = self.sim_rudder.output['comando_leme']
+        except (ValueError, KeyError):
+            # Fail-safe: Se o avião cair num edge case não mapeado, 
+            # o leme assume a posição neutra (0.0)
+            rudder_output = 0.0 
+            
+        # PROFUNDOR
         telemetry['leme_como_entrada'] = rudder_output
         
         for key, value in telemetry.items():
@@ -101,7 +108,11 @@ class HarpiaFuzzyEngine:
             except ValueError:
                 pass
                 
-        self.sim_elevator.compute()
-        elevator_output = self.sim_elevator.output['comando_profundor']
-        
+        try:
+            self.sim_elevator.compute()
+            elevator_output = self.sim_elevator.output['comando_profundor']
+        except (ValueError, KeyError):
+            # Fail-safe de novo
+            elevator_output = 0.0
+            
         return rudder_output, elevator_output

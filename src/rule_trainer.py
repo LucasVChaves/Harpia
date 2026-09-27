@@ -2,7 +2,6 @@ import csv
 import logging
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import skfuzzy as fuzz
 
@@ -53,14 +52,18 @@ class NeuroFuzzyTrainer:
         return df_final
 
     def _find_optimal_k(self, X_scaled: np.ndarray) -> int:
-        logger.info(f"Avaliando K ótimo (limite {self.max_clusters}) via cotovelo ortogonal...")
+        logger.info(f"Avaliando K ótimo (limite {self.max_clusters}) via cotovelo ortogonal (FCM)...")
         wcss = []
         cluster_range = range(1, self.max_clusters + 1)
         
+        # O FCM do skfuzzy exige a matriz transposta: (features, amostras)
+        alldata = X_scaled.T
+        
         for k in cluster_range:
-            kmeans = KMeans(n_clusters=k, init='k-means++', random_state=42, n_init='auto')
-            kmeans.fit(X_scaled)
-            wcss.append(kmeans.inertia_)
+            cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
+                alldata, c=k, m=2.0, error=1e-5, maxiter=1000, init=None
+            )
+            wcss.append(jm[-1])
 
         k_norm = MinMaxScaler().fit_transform(np.array(cluster_range).reshape(-1, 1))
         wcss_norm = MinMaxScaler().fit_transform(np.array(wcss).reshape(-1, 1))
@@ -78,12 +81,12 @@ class NeuroFuzzyTrainer:
         k_opt = cluster_range[np.argmax(distancias)]
         
         try:
-            from plotter import plot_metodo_cotovelo
-            plot_metodo_cotovelo(list(cluster_range), wcss, k_opt, "fig_grafico_cotovelo.png")
+            from plotter import plot_elbow
+            plot_elbow(list(cluster_range), wcss, k_opt, "elbow_plot.png")
         except ImportError:
             pass
             
-        logger.info(f"Convergência concluída. K ótimo: {k_opt} regras.")
+        logger.info(f"Convergência do FCM concluída. K ótimo: {k_opt} regras.")
         return k_opt
 
     def _translate_to_fuzzy(self, variable_name: str, value: float) -> str:
@@ -95,7 +98,7 @@ class NeuroFuzzyTrainer:
         return max(memberships, key=memberships.get)
 
     def train_and_export(self, output_csv_path: str, target: str, base_csv_path: str):
-        logger.info(f"Iniciando pipeline Neurofuzzy para: {target.upper()}")
+        logger.info(f"Iniciando pipeline Neurofuzzy (FCM) para: {target.upper()}")
         
         df = self.generate_synthetic_data(num_scenarios=2000)
         
@@ -110,9 +113,15 @@ class NeuroFuzzyTrainer:
         
         k_opt = self._find_optimal_k(X_scaled)
         
-        kmeans = KMeans(n_clusters=k_opt, random_state=42, n_init=10)
-        kmeans.fit(X_scaled)
-        centers = scaler.inverse_transform(kmeans.cluster_centers_)
+        logger.info("Extraindo matriz de centroides via Fuzzy C-Means...")
+        alldata = X_scaled.T
+        cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
+            alldata, c=k_opt, m=2.0, error=1e-5, maxiter=1000, init=None
+        )
+        
+        centers = scaler.inverse_transform(cntr)
+        
+        labels = np.argmax(u, axis=0) 
         
         extracted_rules = []
         
@@ -135,7 +144,7 @@ class NeuroFuzzyTrainer:
                 vel_term = self._translate_to_fuzzy('velocidade', center[2])
                 antecedents_str = f"altitude=={alt_term}|taxa_descida=={td_term}|velocidade=={vel_term}"
             
-            mean_output = df[kmeans.labels_ == i][target].mean()
+            mean_output = df[labels == i][target].mean()
             out_term = self._translate_to_fuzzy(target, mean_output)
             
             rule_dict = {

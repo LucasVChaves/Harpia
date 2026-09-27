@@ -7,9 +7,5 @@ velocidade==lenta|taxa_descida==elevada,AND,comando_profundor,puxar_suave
 velocidade==rapida,AND,comando_profundor,puxar_forte
 leme_como_entrada==esquerda_total|leme_como_entrada==direita_total,OR,comando_profundor,puxar_suave
 vento_traves==forte_direita|vento_traves==forte_esquerda,OR,comando_profundor,puxar_suave
-altitude==alta|taxa_descida==baixa|velocidade==ideal,AND,comando_profundor,puxar_suave
 altitude==ideal_para_flare|taxa_descida==baixa|velocidade==ideal,AND,comando_profundor,puxar_suave
-altitude==ideal_para_flare|taxa_descida==adequada|velocidade==rapida,AND,comando_profundor,puxar_forte
-altitude==muito_baixa|taxa_descida==adequada|velocidade==ideal,AND,comando_profundor,puxar_forte
-altitude==muito_baixa|taxa_descida==adequada|velocidade==rapida,AND,comando_profundor,puxar_suave
 altitude==ideal_para_flare|taxa_descida==adequada|velocidade==ideal,AND,comando_profundor,puxar_suave
