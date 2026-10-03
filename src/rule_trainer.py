@@ -103,7 +103,7 @@ class NeuroFuzzyTrainer:
         df = self.generate_synthetic_data(num_scenarios=2000)
         
         if target == 'comando_leme':
-            features = ['altitude', 'vento_traves']
+            features = ['altitude', 'vento_traves', 'velocidade']
         else:
             features = ['altitude', 'taxa_descida', 'velocidade']
             
